@@ -9,28 +9,14 @@ import Foundation
 
 protocol AppSession {
     
-    func dataTask(with url: URL, completionHandler: @escaping @Sendable (Data?, URLResponse?, Error?) -> Void) -> AppSessionDataTask
+    func data(from url: URL, delegate: URLSessionTaskDelegate?) async throws -> (Data, URLResponse)
 }
 
-protocol AppSessionDataTask {
-    
-    func resume()
-}
-
-extension URLSession: AppSession {
-    
-    func dataTask(with url: URL, completionHandler: @escaping @Sendable (Data?, URLResponse?, Error?) -> Void) -> AppSessionDataTask {
-        let task: URLSessionDataTask = self.dataTask(with: url, completionHandler: completionHandler)
-        return task
-    }
-}
-extension URLSessionDataTask: AppSessionDataTask {}
+extension URLSession: AppSession { }
 
 protocol HTTPClient {
     
-//    In case of using Async await that was released - Swift 5.5. But I'll use the "old way"
-//    func get(url: URL) async throws -> Data
-    func get(url: URL, completion: @escaping (Result<Data, ApiError>) -> ())
+    func get(url: URL) async throws -> Data
 }
 
 enum ApiError: String, Error {
@@ -49,22 +35,16 @@ final class NetworkClient: HTTPClient {
         self.session = session
     }
     
-    func get(url: URL, completion: @escaping (Result<Data, ApiError>) -> ()) {
+    func get(url: URL) async throws -> Data {
         
-        session.dataTask(with: url) { (data, response, error) in
-            if let _ = error {
-                completion(.failure(ApiError.apiError))
-                return
-            }
-            guard let response = response, let data = data else {
-                completion(.failure(ApiError.apiError))
-                return
-            }
+        do {
+            let (data, response) = try await session.data(from: url, delegate: nil)
             guard let statusCode = (response as? HTTPURLResponse)?.statusCode, 200..<299 ~= statusCode else {
-                completion(.failure(ApiError.invalidResponse))
-                return
+                throw ApiError.invalidResponse
             }
-            completion(.success(data))
-        }.resume()
+            return data
+        } catch {
+            throw ApiError.apiError
+        }
     }
 }

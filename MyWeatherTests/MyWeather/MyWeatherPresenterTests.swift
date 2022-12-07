@@ -10,19 +10,22 @@ import XCTest
 
 final class MyWeatherPresenterTests: XCTestCase {
 
-    func test_loadWeather_askForWeather() {
+    func test_loadWeather_askForWeather() throws {
         
         let weatherInteractorSpy = WeatherInteractorSpy()
         let sut = makeSUT(weatherInteractor: weatherInteractorSpy)
         let city = AppCity.chicago
         
-        sut.loadWeather(location: city, completion: { (_, _) in })
-        
+        let exp = expectation(description: "waiting completion")
+        sut.loadWeather(location: city, completion: { _ in
+            exp.fulfill()
+        })
+        wait(for: [exp], timeout: 0.1)
         XCTAssertEqual(weatherInteractorSpy.askedCoordinates, [city.coordinate])
     }
     
     func test_loadWeather_completeWithWeather() {
-        
+
         let weatherInteractorSpy = WeatherInteractorSpy()
         let sut = makeSUT(weatherInteractor: weatherInteractorSpy)
         let city = AppCity.chicago
@@ -33,48 +36,71 @@ final class MyWeatherPresenterTests: XCTestCase {
                                                             currentTemp: "\(weather.currentTemp!) C°",
                                                             maxTemp: "\(weather.maxTemp!) C°",
                                                             minTemp: "\(weather.minTemp!) C°")
-        
+
         let dailyConfig = DailyWeatherCellConfiguration(date: weather.timestamp.formatted(date: .numeric, time: .omitted),
                                                         iconName: weather.weather.iconName,
                                                         condition: weather.weather.conditionName,
                                                         maxTemp: "\(weather.maxTemp!) C°",
                                                         minTemp: "\(weather.minTemp!) C°")
-        
-        var capturedResult: (CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration])?
-        
-        sut.loadWeather(location: city, completion: { (currentConfig, dailyConfigs) in
-            capturedResult = (currentConfig, dailyConfigs)
+
+        var capturedResult: Result<(CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration]), Error>? = nil
+        let exp = expectation(description: "waiting completion")
+
+        weatherInteractorSpy.fetchWeatherStub = (response: (.anyWeather, [.anyWeather, .anyWeather]), error: nil)
+
+        sut.loadWeather(location: city, completion: { result in
+            capturedResult = result
+            exp.fulfill()
         })
-        
-        weatherInteractorSpy.completions[0](.success((.anyWeather, [.anyWeather, .anyWeather])))
-        
-        XCTAssertEqual(capturedResult!.0, currentConfig)
-        XCTAssertEqual(capturedResult!.1, [dailyConfig, dailyConfig])
+
+        wait(for: [exp], timeout: 0.3)
+        switch capturedResult {
+        case let .success((config, dailyConfigs)):
+
+            XCTAssertEqual(config, currentConfig)
+            XCTAssertEqual(dailyConfigs, [dailyConfig, dailyConfig])
+        default:
+
+            XCTFail("Completion must succeeded")
+        }
     }
     
     func test_searchCity_askForCity() {
         let locationInteractorSpy = LocationInteractorSpy()
         let sut = makeSUT(locationInteractor: locationInteractorSpy)
         let city = AppCity.chicago
+        let exp = expectation(description: "waiting completion")
         
-        sut.search(cityName: city.name, completion: { _ in })
-        
+        sut.search(cityName: city.name, completion: { _ in
+            exp.fulfill()
+        })
+        wait(for: [exp], timeout: 0.1)
         XCTAssertEqual(locationInteractorSpy.askedCities, [city.name])
     }
     
     func test_searchCity_completeWithCity() {
+        
         let locationInteractorSpy = LocationInteractorSpy()
         let sut = makeSUT(locationInteractor: locationInteractorSpy)
         let city = AppCity.chicago
-        var captureResult = [AppCity]()
+        var captureResult: Result<[AppCity], Error>? = nil
+        let exp = expectation(description: "waiting completion")
         
-        sut.search(cityName: city.name, completion: { cities in
-            captureResult.append(contentsOf: cities)
+        locationInteractorSpy.fetchCitiesStub = (response: [city], error: nil)
+        sut.search(cityName: city.name, completion: { result in
+            
+            captureResult = result
+            exp.fulfill()
         })
+        wait(for: [exp], timeout: 0.3)
+        switch captureResult {
+        case let .success(captureCities):
+            
+            XCTAssertEqual(captureCities, [city])
+        default:
+            XCTFail("Completion must succeeded")
+        }
         
-        locationInteractorSpy.completions[0](.success([city]))
-        
-        XCTAssertEqual(captureResult, [city])
     }
     
 // MARK: Helpers

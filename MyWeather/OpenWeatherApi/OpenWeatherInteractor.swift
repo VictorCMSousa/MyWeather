@@ -32,58 +32,32 @@ final class OpenWeatherInteractor: WeatherInteractor {
         self.client = client
     }
     
-    func fetchWeather(location: AppCoordinate, completion: @escaping (Result<(DailyWeather, [DailyWeather]), ApiError>) -> ()) {
+    func fetchWeather(location: AppCoordinate) async throws -> (DailyWeather, [DailyWeather]) {
+        guard let requestURL = makeGetWeatherURL(location: location) else { throw ApiError.invalidURLFormat }
         
-        guard let requestURL = makeGetWeatherURL(location: location) else {
-            completion(.failure(ApiError.invalidURLFormat))
-            return
+        let data = try await client.get(url: requestURL)
+        guard let root = try? JSONDecoder().decode(OpenWeatherRoot.self, from: data) else {
+            
+            throw ApiError.decodeError
         }
-        client.get(url: requestURL, completion: { (result: Result<Data, ApiError>) in
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let data):
-                    guard let root = try? JSONDecoder().decode(OpenWeatherRoot.self, from: data) else {
-                        
-                        completion(.failure(.decodeError))
-                        return
-                    }
-                    let currentWeather = DailyWeather.map(current: root.current, dailyToday: root.daily.findTodayDaily())
-                    let dailyWeather = root.daily.map({ DailyWeather.map(daily: $0) })
-                    
-                    completion(.success((currentWeather, dailyWeather)))
-                case .failure(let error):
-                    completion(.failure(error))
-                }
-            }
-        })
+        let currentWeather = DailyWeather.map(current: root.current, dailyToday: root.daily.findTodayDaily())
+        let dailyWeather = root.daily.map({ DailyWeather.map(daily: $0) })
+        return (currentWeather, dailyWeather)
     }
 }
 
 extension OpenWeatherInteractor: LocationInteractor {
 
-    func fetchCities(cityName: String, completion: @escaping (Result<[AppCity], ApiError>) -> ()) {
-        
+    func fetchCities(cityName: String) async throws -> [AppCity] {
         guard let requestURL = makeGetGeoCoordinateURL(cityName: cityName) else {
-            completion(.failure(.invalidURLFormat))
-            return
+            throw ApiError.invalidURLFormat
         }
-        
-        client.get(url: requestURL) { (result: Result<Data, ApiError>) in
-            DispatchQueue.main.async {
-                switch result {
-                case let .success(data):
-                    guard let openLocation = try? JSONDecoder().decode([OpenWeatherLocation].self, from: data) else {
-                        
-                        completion(.failure(.decodeError))
-                        return
-                    }
-                    completion(.success(openLocation.map({ AppCity.map(weatherLocation: $0) })))
-                case .failure(let error):
-                    completion(.failure(error))
-                }
-            }
+        let data = try await client.get(url: requestURL)
+        guard let openLocation = try? JSONDecoder().decode([OpenWeatherLocation].self, from: data) else {
             
+            throw ApiError.decodeError
         }
+        return openLocation.map({ AppCity.map(weatherLocation: $0) })
     }
 }
 

@@ -41,15 +41,16 @@ final class SearchResultViewControllerTests: XCTestCase {
 }
 
 final class SearchResultViewControllerPresenterSpy: SearchResultViewControllerPresenter {
-
-    var cityNames = [String]()
-    var completions = [([AppCity]) -> ()]()
     
-    func search(cityName: String, completion: @escaping ([AppCity]) -> ()) {
-        
+    
+    var cityNames = [String]()
+    var completions = [(Result<[MyWeather.AppCity], Error>) -> ()]()
+    
+    func search(cityName: String, completion: @escaping (Result<[MyWeather.AppCity], Error>) -> ()) {
         cityNames.append(cityName)
         completions.append(completion)
     }
+
 }
 
 final class SearchResultViewControllerDelegateSpy: SearchResultViewControllerDelegate {

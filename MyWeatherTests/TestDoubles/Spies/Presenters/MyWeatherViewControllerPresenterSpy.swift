@@ -11,11 +11,19 @@ import Foundation
 final class MyWeatherViewControllerPresenterSpy: MyWeatherViewControllerPresenter {
     
     var requestedLocations = [AppCity]()
-    var completions = [((CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration])) -> ()]()
+    var completionsConfigs = [((CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration])) -> ()]()
     
     func loadWeather(location: AppCity, completion: @escaping ((CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration])) -> ()) {
         
         requestedLocations.append(location)
-        completions.append(completion)
+        completionsConfigs.append(completion)
+    }
+    
+    var completionsResults = [((Result<(CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration]), Error>)) -> ()]()
+    func loadWeather(location: AppCity,
+                     completion: @escaping (Result<(CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration]), Error>) -> ()) {
+        
+        requestedLocations.append(location)
+        completionsResults.append(completion)
     }
 }

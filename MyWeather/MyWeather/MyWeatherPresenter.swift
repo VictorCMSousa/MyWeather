@@ -22,17 +22,22 @@ final class MyWeatherPresenter {
 
 extension MyWeatherPresenter: MyWeatherViewControllerPresenter {
     
-    func loadWeather(location: AppCity, completion: @escaping ((CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration])) -> ()) {
+    func loadWeather(location: AppCity,
+                     completion: @escaping (Result<(CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration]), Error>) -> ()) {
         
-        weatherInteractor.fetchWeather(location: location.coordinate) { [weak self] result in
-            guard let self else { return }
-            switch result {
-            case let .success((currentWeather, dailyWeathers)):
+        Task {
+            do {
+                
+                let (currentWeather, dailyWeathers) = try await weatherInteractor.fetchWeather(location: location.coordinate)
                 let currentWeatherConfig = self.map(cityName: location.name, currentWeather: currentWeather)
                 let dailyConfig = dailyWeathers.map({ self.map(weather: $0) })
-                completion((currentWeatherConfig, dailyConfig))
-            case let .failure(error):
-                print(error) // Should show to the user somehow and track the issue
+                DispatchQueue.main.async {
+                    completion(.success((currentWeatherConfig, dailyConfig)))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
             }
         }
     }
@@ -64,14 +69,18 @@ extension MyWeatherPresenter: MyWeatherViewControllerPresenter {
 
 extension MyWeatherPresenter: SearchResultViewControllerPresenter {
 
-    func search(cityName: String, completion: @escaping ([AppCity]) -> ()) {
-        locationInteractor.fetchCities(cityName: cityName) { result in
-            
-            switch result {
-            case let .success(cities):
-                completion(cities)
-            case let .failure(error):
-                print(error) // Should show to the user somehow and track the issue
+    func search(cityName: String, completion: @escaping (Result<[AppCity], Error>) -> ()) {
+        
+        Task {
+            do {
+                let cities = try await locationInteractor.fetchCities(cityName: cityName)
+                DispatchQueue.main.async {
+                    completion(.success(cities))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
             }
         }
     }

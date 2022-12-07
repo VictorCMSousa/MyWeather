@@ -18,4 +18,18 @@ final class LocationInteractorSpy: LocationInteractor {
         askedCities.append(cityName)
         completions.append(completion)
     }
+    
+    var fetchCitiesStub: (response: [AppCity], error: Error?)? = nil
+    func fetchCities(cityName: String) async throws -> [AppCity] {
+        
+        askedCities.append(cityName)
+        
+        guard let stub = fetchCitiesStub else { throw NSError(domain: "Need to set a stub", code: 0) }
+        
+        if let error = stub.error {
+            
+            throw error
+        }
+        return stub.response
+    }
 }

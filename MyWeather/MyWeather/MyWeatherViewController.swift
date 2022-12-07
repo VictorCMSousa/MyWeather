@@ -9,7 +9,8 @@ import UIKit
 
 protocol MyWeatherViewControllerPresenter {
     
-    func loadWeather(location: AppCity, completion: @escaping ((CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration]))->())
+    func loadWeather(location: AppCity,
+                     completion: @escaping (Result<(CurrentWeatherCellConfiguration, [DailyWeatherCellConfiguration]), Error>) -> ())
 }
 
 protocol CitySearchResultView: UIViewController, UISearchResultsUpdating { }
@@ -113,13 +114,19 @@ extension MyWeatherViewController: UITableViewDataSource, UITableViewDelegate {
 extension MyWeatherViewController: SearchResultViewControllerDelegate {
     
     func wantToShowWeather(city: AppCity) {
-        presenter?.loadWeather(location: city, completion: { [weak self] (current, dailyWeathers) in
+        presenter?.loadWeather(location: city, completion: { [weak self] result in
             
             guard let self else { return }
-            self.searchController?.isActive = false
-            self.currentConfig = current
-            self.dailyConfig = dailyWeathers
-            self.tableView.reloadData()
+            switch result {
+            case let .success((current, dailyWeathers)):
+                
+                self.searchController?.isActive = false
+                self.currentConfig = current
+                self.dailyConfig = dailyWeathers
+                self.tableView.reloadData()
+            case let .failure(error):
+                print(error)
+            }
         })
     }
 }

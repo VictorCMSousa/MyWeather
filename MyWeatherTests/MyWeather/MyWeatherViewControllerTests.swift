@@ -34,7 +34,7 @@ final class MyWeatherViewControllerTests: XCTestCase {
         let chicago: AppCity = .chicago
         
         sut.wantToShowWeather(city: chicago)
-        
+
         XCTAssertEqual(presenterSpy.requestedLocations, [london, chicago])
     }
     
@@ -45,13 +45,13 @@ final class MyWeatherViewControllerTests: XCTestCase {
         let city: AppCity = .chicago
         sut.wantToShowWeather(city: city)
         
-        presenterSpy.completions[0]((.any, [.any, .any]))
+        presenterSpy.completionsResults[0]((.success((.any, [.any, .any]))))
         
         XCTAssertEqual(sut.tableView.numberOfRows(inSection: 0), 3)
         
         sut.wantToShowWeather(city: city)
         
-        presenterSpy.completions[1]((.any, [.any]))
+        presenterSpy.completionsResults[1]((.success((.any, [.any]))))
         
         XCTAssertEqual(sut.tableView.numberOfRows(inSection: 0), 2)
     }
@@ -63,7 +63,7 @@ final class MyWeatherViewControllerTests: XCTestCase {
         let city: AppCity = .chicago
         sut.wantToShowWeather(city: city)
         
-        presenterSpy.completions[0]((.any, [.any, .any]))
+        presenterSpy.completionsResults[0]((.success((.any, [.any, .any]))))
         
         let currentWeatherCell = sut.tableView.cellForRow(at: IndexPath(row: 0, section: 0)) as? CurrentWeatherCell
         let dailyCell = sut.tableView.cellForRow(at: IndexPath(row: 1, section: 0)) as? DailyWeatherCell

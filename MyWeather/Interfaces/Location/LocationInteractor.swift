@@ -9,5 +9,5 @@ import Foundation
 
 protocol LocationInteractor {
     
-    func fetchCities(cityName: String, completion: @escaping (Result<[AppCity], ApiError>) -> ())
+    func fetchCities(cityName: String) async throws -> [AppCity]
 }

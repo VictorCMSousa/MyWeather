@@ -9,5 +9,5 @@ import Foundation
 
 protocol WeatherInteractor {
     
-    func fetchWeather(location: AppCoordinate, completion: @escaping (Result<(DailyWeather, [DailyWeather]), ApiError>)->())
+    func fetchWeather(location: AppCoordinate) async throws -> (DailyWeather, [DailyWeather])
 }

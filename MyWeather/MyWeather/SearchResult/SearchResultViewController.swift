@@ -9,7 +9,7 @@ import UIKit
 
 protocol SearchResultViewControllerPresenter {
     
-    func search(cityName: String, completion: @escaping ([AppCity])->())
+    func search(cityName: String, completion: @escaping (Result<[AppCity], Error>) -> ())
 }
 
 protocol SearchResultViewControllerDelegate: AnyObject {
@@ -57,9 +57,15 @@ final class SearchResultViewController: UITableViewController, CitySearchResultV
     
     @objc private func filterContentForSearchText(searchController: UISearchController) {
         guard let cityName = searchController.searchBar.text, !cityName.isEmpty else { return }
-        presenter?.search(cityName: cityName, completion: { [weak self] cities in
-            self?.cities = cities
-            self?.tableView.reloadData()
+        presenter?.search(cityName: cityName, completion: { [weak self] result in
+            
+            switch result {
+            case let .success(cities):
+                self?.cities = cities
+                self?.tableView.reloadData()
+            case let .failure(error):
+                print(error)
+            }
         })
     }
 }
