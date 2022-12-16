@@ -10,12 +10,13 @@ import XCTest
 
 final class OpenWeatherInteractorTests: XCTestCase {
     
-    func test_fetchWeather_validURL() {
+    func test_fetchWeather_validURL() async throws {
         
         let clientSpy = HTTPClientSpy()
         let sut = makeSUTWeather(client: clientSpy)
         let chicagoCoordinate = AppCity.chicago.coordinate
-        sut.fetchWeather(location: chicagoCoordinate, completion: { _ in })
+        clientSpy.getUrlStub = (.weatherResponse, nil)
+        let _ = try await sut.fetchWeather(location: chicagoCoordinate)
         
         XCTAssertEqual(clientSpy.getURLs.count, 1)
         
@@ -28,73 +29,42 @@ final class OpenWeatherInteractorTests: XCTestCase {
         XCTAssertEqual(received.query?.contains("exclude=hourly,minutely,alerts"), true, "kind excluded")
         XCTAssertEqual(received.query?.contains("units=metric"), true, "unit")
     }
-    
-    func test_fetchWeather_mapDailyWeatherOnCompletion() {
-        
+
+    func test_fetchWeather_mapDailyWeatherOnCompletion() async throws {
+
         let clientSpy = HTTPClientSpy()
         let sut = makeSUTWeather(client: clientSpy)
-        let expectation = expectation(description: "waiting completion")
-        
-        var capturedResult: Result<(DailyWeather, [DailyWeather]), ApiError> = .failure(.invalidURLFormat)
-        sut.fetchWeather(location: AppCity.chicago.coordinate, completion: { result in
-            capturedResult = result
-            expectation.fulfill()
-        })
-        
-        clientSpy.completions[0](.success(.weatherResponse))
-        
-        wait(for: [expectation], timeout: 0.5)
-        switch capturedResult {
-        case let .success((current, daily)):
-            XCTAssertEqual(daily.count, 8)
-            XCTAssertNotNil(current)
-        case .failure(let error):
-            XCTFail("expecting success got \(error)")
-        }
+        clientSpy.getUrlStub = (.weatherResponse, nil)
+
+        let (current, daily) = try await sut.fetchWeather(location: AppCity.chicago.coordinate)
+
+        XCTAssertEqual(daily.count, 8)
+        XCTAssertNotNil(current)
     }
-    
-    func test_fetchWeather_decodeErrorOnEmptyData() {
-        
+
+    func test_fetchWeather_decodeErrorOnEmptyData() async throws {
+
         let clientSpy = HTTPClientSpy()
         let sut = makeSUTWeather(client: clientSpy)
-        let expectation = expectation(description: "waiting completion")
-        
-        var capturedResult: Result<(DailyWeather, [DailyWeather]), ApiError> = .failure(.invalidURLFormat)
-        sut.fetchWeather(location: AppCity.chicago.coordinate, completion: { result in
-            capturedResult = result
-            expectation.fulfill()
-        })
-        
-        clientSpy.completions[0](.success(Data()))
-        
-        wait(for: [expectation], timeout: 0.5)
-        switch capturedResult {
-        case .success:
+        clientSpy.getUrlStub = (Data(), nil)
+        do {
+            let _ = try await sut.fetchWeather(location: AppCity.chicago.coordinate)
             XCTFail("expecting failure")
-        case .failure(let error):
+        } catch let error as ApiError {
             XCTAssertEqual(error, .decodeError)
         }
     }
-    
-    func test_fetchWeather_apiErrorOnClientError() {
-        
+
+    func test_fetchWeather_apiErrorOnClientError() async throws{
+
         let clientSpy = HTTPClientSpy()
         let sut = makeSUTWeather(client: clientSpy)
-        let expectation = expectation(description: "waiting completion")
-        
-        var capturedResult: Result<(DailyWeather, [DailyWeather]), ApiError> = .failure(.invalidURLFormat)
-        sut.fetchWeather(location: AppCity.chicago.coordinate, completion: { result in
-            capturedResult = result
-            expectation.fulfill()
-        })
-        
-        clientSpy.completions[0](.failure(.apiError))
-        
-        wait(for: [expectation], timeout: 0.5)
-        switch capturedResult {
-        case .success:
+
+        clientSpy.getUrlStub = (Data(), ApiError.apiError)
+        do {
+            let _ = try await sut.fetchWeather(location: AppCity.chicago.coordinate)
             XCTFail("expecting failure")
-        case .failure(let error):
+        } catch let error as ApiError {
             XCTAssertEqual(error, .apiError)
         }
     }
@@ -113,15 +83,17 @@ final class OpenWeatherInteractorTests: XCTestCase {
 
 extension OpenWeatherInteractorTests{
     
-    func test_fetchCities_validURL() {
-        
+    func test_fetchCities_validURL() async throws{
+
         let clientSpy = HTTPClientSpy()
         let sut = makeSUTLocation(client: clientSpy)
         let chicago = AppCity.chicago
-        sut.fetchCities(cityName: chicago.name, completion: { _ in })
+        clientSpy.getUrlStub = (.anyCityResponse, nil)
         
+        let _ = try await sut.fetchCities(cityName: chicago.name)
+
         XCTAssertEqual(clientSpy.getURLs.count, 1)
-        
+
         let received = clientSpy.getURLs[0]
         XCTAssertEqual(received.scheme, "https", "scheme")
         XCTAssertEqual(received.host, "api.openweathermap.org", "host")
@@ -129,100 +101,61 @@ extension OpenWeatherInteractorTests{
         XCTAssertEqual(received.query?.contains("q=\(chicago.name)"), true, "cityName")
         XCTAssertEqual(received.query?.contains("limit=5"), true, "limit response")
     }
-    
-    func test_fetchCities_mapAppCitiesOnCompletion() {
-        
+
+    func test_fetchCities_mapAppCitiesOnCompletion() async throws {
+
         let clientSpy = HTTPClientSpy()
         let sut = makeSUTLocation(client: clientSpy)
         let chicago = AppCity.chicago
-        let expectation = expectation(description: "waiting completion")
-        
-        var capturedResult:Result<[AppCity], ApiError> = .failure(.invalidURLFormat)
-        sut.fetchCities(cityName: chicago.name, completion: { result in
-            capturedResult = result
-            expectation.fulfill()
-        })
-        
-        clientSpy.completions[0](.success(.anyCityResponse))
-        
-        wait(for: [expectation], timeout: 0.5)
-        switch capturedResult {
-        case let .success(appCities):
-            XCTAssertTrue(appCities.contains(chicago))
-            XCTAssertEqual(appCities.count, 5)
-        case .failure(let error):
-            XCTFail("expecting success got \(error)")
-        }
+        clientSpy.getUrlStub = (.anyCityResponse, nil)
+
+        let appCities = try await sut.fetchCities(cityName: chicago.name)
+
+        XCTAssertTrue(appCities.contains(chicago))
+        XCTAssertEqual(appCities.count, 5)
     }
-    
-    func test_fetchCities_decodeErrorOnEmptyData() {
-        
+
+    func test_fetchCities_decodeErrorOnEmptyData() async throws {
+
         let clientSpy = HTTPClientSpy()
         let sut = makeSUTLocation(client: clientSpy)
         let chicago = AppCity.chicago
-        let expectation = expectation(description: "waiting completion")
-        
-        var capturedResult:Result<[AppCity], ApiError> = .failure(.invalidURLFormat)
-        sut.fetchCities(cityName: chicago.name, completion: { result in
-            capturedResult = result
-            expectation.fulfill()
-        })
-        
-        clientSpy.completions[0](.success(Data()))
-        
-        wait(for: [expectation], timeout: 0.5)
-        switch capturedResult {
-        case .success:
-            XCTFail("expecting failure")
-        case .failure(let error):
+        clientSpy.getUrlStub = (Data(), nil)
+
+        do {
+            let _ = try await sut.fetchCities(cityName: chicago.name)
+        } catch let error as ApiError {
+            
             XCTAssertEqual(error, .decodeError)
         }
     }
-    
-    func test_fetchCities_decodeErrorOnWrongData() {
-        
+
+    func test_fetchCities_decodeErrorOnWrongData() async throws {
+
         let clientSpy = HTTPClientSpy()
         let sut = makeSUTLocation(client: clientSpy)
         let chicago = AppCity.chicago
-        let expectation = expectation(description: "waiting completion")
-        
-        var capturedResult:Result<[AppCity], ApiError> = .failure(.invalidURLFormat)
-        sut.fetchCities(cityName: chicago.name, completion: { result in
-            capturedResult = result
-            expectation.fulfill()
-        })
-        
-        clientSpy.completions[0](.success(.weatherResponse))
-        
-        wait(for: [expectation], timeout: 0.5)
-        switch capturedResult {
-        case .success:
-            XCTFail("expecting failure")
-        case .failure(let error):
+        clientSpy.getUrlStub = (.weatherResponse, nil)
+
+        do {
+            let _ = try await sut.fetchCities(cityName: chicago.name)
+        } catch let error as ApiError {
+            
             XCTAssertEqual(error, .decodeError)
         }
     }
-    
-    func test_fetchCities_apiErrorOnClientError() {
-        
+
+    func test_fetchCities_apiErrorOnClientError() async throws {
+
         let clientSpy = HTTPClientSpy()
         let sut = makeSUTLocation(client: clientSpy)
         let chicago = AppCity.chicago
-        let expectation = expectation(description: "waiting completion")
         
-        var capturedResult:Result<[AppCity], ApiError> = .failure(.invalidURLFormat)
-        sut.fetchCities(cityName: chicago.name, completion: { result in
-            capturedResult = result
-            expectation.fulfill()
-        })
-        
-        clientSpy.completions[0](.failure(.apiError))
-        
-        wait(for: [expectation], timeout: 0.5)
-        switch capturedResult {
-        case .success:
+        clientSpy.getUrlStub = (Data(), ApiError.apiError)
+        do {
+            let _ = try await sut.fetchCities(cityName: chicago.name)
             XCTFail("expecting failure")
-        case .failure(let error):
+        } catch let error as ApiError {
             XCTAssertEqual(error, .apiError)
         }
     }

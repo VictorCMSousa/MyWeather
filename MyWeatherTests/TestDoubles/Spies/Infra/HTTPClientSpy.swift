@@ -19,12 +19,12 @@ final class HTTPClientSpy: HTTPClient {
         completions.append(completion)
     }
     
-    var getUrlReturn: (data: Data, error: Error?) = (Data(), nil)
+    var getUrlStub: (data: Data, error: Error?) = (Data(), nil)
     func get(url: URL) async throws -> Data {
         getURLs.append(url)
-        if let error = getUrlReturn.error {
+        if let error = getUrlStub.error {
             throw error
         }
-        return getUrlReturn.data
+        return getUrlStub.data
     }
 }
